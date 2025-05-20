@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  server:
+    image: backend
+    container_name: 'cloud-storage-server'
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:3609/users
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 1234
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SPRING_PROFILES_ACTIVE: "docker"
+      LOGGING_FILE_NAME: "/logs/application.log"
+    volumes:
+      - ./logs:/logs
+      - ./application-docker.yml:/app/config/application.yml
+    networks:
+      - cloud-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:13-alpine
+    container_name: 'cloud-storage-db'
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: users
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_PORT: 3609
+    ports:
+      - "3609:3609"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users -p 3609"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command: postgres -p 3609
+
+volumes:
+  postgres_data:
+
+networks:
+  cloud-network:
+    driver: bridge
